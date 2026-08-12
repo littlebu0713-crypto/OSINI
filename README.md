@@ -201,3 +201,87 @@
   </script>
 </body>
 </html># OSINI
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>台灣 OSINT 簡化版</title>
+  <!-- Leaflet 地圖樣式 -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    body { margin: 0; font-family: sans-serif; background: #121212; color: #fff; }
+    header { padding: 10px 15px; background: #1e1e1e; font-weight: bold; }
+    #container { display: flex; height: calc(100vh - 40px); }
+    #map { flex: 2; height: 100%; }
+    #sidebar { flex: 1; padding: 15px; overflow-y: auto; background: #181818; }
+    .card { background: #242424; margin-bottom: 10px; padding: 10px; border-radius: 4px; }
+    a { color: #4da6ff; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <header>Taiwan OSINT Monitor (極簡版)</header>
+
+  <div id="container">
+    <div id="map"></div>
+    <div id="sidebar">
+      <h3>台灣周邊地震 (USGS)</h3>
+      <div id="earthquakes">載入中...</div>
+    </div>
+  </div>
+
+  <!-- Leaflet 地圖核心程式 -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // 1. 初始化地圖 (定位至台灣)
+    const map = L.map('map').setView([23.6978, 120.9605], 7);
+
+    // 2. 載入暗色地圖圖資
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19
+    }).addTo(map);
+
+    // 3. 標記主要城市
+    L.marker([25.0330, 121.5654]).addTo(map).bindPopup('台北');
+    L.marker([22.6047, 120.2821]).addTo(map).bindPopup('高雄');
+
+    // 4. 抓取台灣區域地震 API
+    fetch('https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/2.5_day.geojson')
+      .then(res => res.json())
+      .then(data => {
+        const listContainer = document.getElementById('earthquakes');
+        listContainer.innerHTML = '';
+
+        // 篩選經緯度 (台灣周邊)
+        const twQuakes = data.features.filter(item => {
+          const [lon, lat] = item.geometry.coordinates;
+          return lon >= 118 && lon <= 124 && lat >= 20 && lat <= 26;
+        });
+
+        if (twQuakes.length === 0) {
+          listContainer.innerHTML = '<p>近 24 小時無顯著地震。</p>';
+          return;
+        }
+
+        twQuakes.forEach(q => {
+          const [lon, lat] = q.geometry.coordinates;
+          const mag = q.properties.mag;
+          const title = q.properties.place;
+
+          // 地圖加上圓圈標記
+          L.circleMarker([lat, lon], { color: 'red', radius: mag * 2 }).addTo(map)
+            .bindPopup(`規模 M${mag} - ${title}`);
+
+          // 右側清單顯示
+          const div = document.createElement('div');
+          div.className = 'card';
+          div.innerHTML = `<strong>規模 M${mag}</strong><br><small>${title}</small>`;
+          listContainer.appendChild(div);
+        });
+      })
+      .catch(() => {
+        document.getElementById('earthquakes').innerText = '無數據或擷取失敗';
+      });
+  </script>
+</body>
+</html>
